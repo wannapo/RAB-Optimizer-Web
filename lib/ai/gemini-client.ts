@@ -18,7 +18,7 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-3.5-flash';
 
 /**
  * Panggil Gemini, minta output JSON murni lewat responseMimeType.
