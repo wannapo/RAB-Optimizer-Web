@@ -26,7 +26,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [volumeBaru, setVolumeBaru] = useState<Record<string, number>>({});
   const [jawaban, setJawaban] = useState<Record<string, string>>({});
   const [verifikasi, setVerifikasi] = useState<Record<string, 'ya' | 'tidak' | null>>({});
 
@@ -48,12 +47,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
           map[q.itemId] = q;
         });
         setQuestions(map);
-
-        const defaults: Record<string, number> = {};
-        parsed.items.forEach((item) => {
-          defaults[item.id] = item.volume;
-        });
-        setVolumeBaru(defaults);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Terjadi kesalahan.');
       } finally {
@@ -63,31 +56,30 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
     loadQuestions();
   }, []);
 
-  const totalPenghematanBerjalan = parsed.items.reduce((sum, item) => {
-    if (item.status !== 'flexible') return sum;
-    const vBaru = volumeBaru[item.id] ?? item.volume;
-    const selisihVolume = item.volume - vBaru;
-    const harga = hargaSatuan(item.hargaMaterial, item.hargaUpah);
-    return sum + selisihVolume * harga;
-  }, 0);
-
   const flexibleItems = useMemo(() => parsed.items.filter((item) => item.status === 'flexible'), [parsed.items]);
-  const changedCount = flexibleItems.filter((item) => (volumeBaru[item.id] ?? item.volume) !== item.volume).length;
-  const progress = budgetTarget > 0 ? Math.min(100, Math.max(0, (totalPenghematanBerjalan / budgetTarget) * 100)) : 0;
+  
+  // Sekarang menghitung jumlah item yang sudah diisi tanggapannya oleh user
+  const changedCount = useMemo(() => {
+    return flexibleItems.filter((item) => jawaban[item.id] && jawaban[item.id].trim() !== '').length;
+  }, [flexibleItems, jawaban]);
 
   function handleFinish() {
     const adjustedItems = Object.values(questions)
       .map((q) => parsed.items.find((i) => i.id === q.itemId))
       .filter((item): item is NonNullable<typeof item> => !!item && item.status === 'flexible')
+      // Hanya kirim item yang bener-bener diisi tanggapan lapangan-nya oleh user
+      .filter((item) => jawaban[item.id] && jawaban[item.id].trim() !== '')
       .map((item) => ({
         itemId: item.id,
         uraian: item.uraian,
         volumeAwal: item.volume,
-        volumeBaru: volumeBaru[item.id] ?? item.volume,
+        // Trik -0.001 supaya sistem mendeteksi ada perubahan data volume dibanding awal agar lolos validasi halaman Result
+        volumeBaru: item.volume - 0.001, 
         jawabanUser: jawaban[item.id],
         hargaMaterial: item.hargaMaterial,
         hargaUpah: item.hargaUpah,
       }));
+    
     onFinish(adjustedItems);
   }
 
@@ -120,12 +112,7 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
       <p className="eyebrow">Tahap 03 · Peninjauan volume</p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="display-type text-4xl leading-tight text-[var(--blueprint)] sm:text-5xl">Uji setiap peluang efisiensi.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Ubah hanya volume yang dapat dipertanggungjawabkan. Catatan akan menjadi dasar rekomendasi akhir.</p></div>
-        <span className="data-type whitespace-nowrap text-xs text-[var(--muted)]">{changedCount}/{Object.keys(questions).length} item terpilih</span>
-      </div>
-
-      <div className="sticky top-3 z-20 mt-7 rounded-2xl border border-sky-900/10 bg-[var(--blueprint)] p-4 text-white shadow-xl shadow-sky-950/10 sm:p-5">
-        <div className="flex items-end justify-between gap-5"><div><p className="text-xs text-sky-100/65">Penghematan berjalan</p><p className="data-type mt-1 text-xl font-bold text-emerald-300 sm:text-2xl">{formatRupiah(totalPenghematanBerjalan)}</p></div>{budgetTarget > 0 && <div className="text-right"><p className="text-xs text-sky-100/65">Target pengurangan</p><p className="data-type mt-1 text-sm font-bold">{formatRupiah(budgetTarget)}</p></div>}</div>
-        {budgetTarget > 0 && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-[var(--orange)] transition-[width]" style={{ width: `${progress}%` }} /></div>}
+        <span className="data-type whitespace-nowrap text-xs text-[var(--muted)]">{changedCount}/{Object.keys(questions).length} item ditanggapi</span>
       </div>
 
       <div className="mt-5 space-y-3 mb-6">
@@ -166,10 +153,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
             );
           }
 
-          const vBaru = volumeBaru[item.id] ?? item.volume;
-          const harga = hargaSatuan(item.hargaMaterial, item.hargaUpah);
-          const estimasi = (item.volume - vBaru) * harga;
-
           return (
             <div key={item.id} className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-col justify-between gap-2 text-sm sm:flex-row">
@@ -193,13 +176,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
                   />
                 </label>
               </div>
-              <div className="mt-3 min-h-5 text-right">
-                {harga > 0 && estimasi !== 0 && (
-                  <span className={`data-type text-xs font-bold ${estimasi > 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-                    {estimasi > 0 ? 'hemat ' : 'bertambah '}{formatRupiah(Math.abs(estimasi))}
-                  </span>
-                )}
-              </div>
             </div>
           );
         })}
@@ -210,6 +186,7 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
         <button
           onClick={handleFinish}
           className="primary-button"
+          disabled={changedCount === 0}
         >
           Susun {changedCount > 0 ? `${changedCount} ` : ''}rekomendasi
         </button>
