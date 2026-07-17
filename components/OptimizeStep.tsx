@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ParsedRAB, RABQuestion } from '@/lib/types/rab';
-import { formatRupiah, hargaSatuan } from '@/lib/utils/format';
 
 interface Props {
   parsed: ParsedRAB;
@@ -58,7 +57,7 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
 
   const flexibleItems = useMemo(() => parsed.items.filter((item) => item.status === 'flexible'), [parsed.items]);
   
-  // Sekarang menghitung jumlah item yang sudah diisi tanggapannya oleh user
+  // Menghitung jumlah item yang sudah diisi tanggapannya oleh user
   const changedCount = useMemo(() => {
     return flexibleItems.filter((item) => jawaban[item.id] && jawaban[item.id].trim() !== '').length;
   }, [flexibleItems, jawaban]);
@@ -67,14 +66,13 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
     const adjustedItems = Object.values(questions)
       .map((q) => parsed.items.find((i) => i.id === q.itemId))
       .filter((item): item is NonNullable<typeof item> => !!item && item.status === 'flexible')
-      // Hanya kirim item yang bener-bener diisi tanggapan lapangan-nya oleh user
+      // Hanya kirim item yang bener-bener diisi tanggapan lapangannya oleh user
       .filter((item) => jawaban[item.id] && jawaban[item.id].trim() !== '')
       .map((item) => ({
         itemId: item.id,
         uraian: item.uraian,
         volumeAwal: item.volume,
-        // Trik -0.001 supaya sistem mendeteksi ada perubahan data volume dibanding awal agar lolos validasi halaman Result
-        volumeBaru: item.volume - 0.001, 
+        volumeBaru: item.volume, // Dikirim utuh, AI backend yang bertugas menimpa dengan angka volume usulan baru
         jawabanUser: jawaban[item.id],
         hargaMaterial: item.hargaMaterial,
         hargaUpah: item.hargaUpah,

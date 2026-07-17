@@ -39,23 +39,24 @@ export function buildQuestionsPrompt(items: RABItem[]): { system: string; user: 
 }
 
 const RECOMMEND_SYSTEM_PROMPT = `Kamu adalah asisten ahli estimasi biaya konstruksi (Quantity Surveyor) di Indonesia.
-Tugasmu: menyusun rekomendasi dan catatan justifikasi akhir berdasarkan tanggapan atau kondisi lapangan yang diinput oleh user.
+Tugasmu: Menyusun rekomendasi final DAN menentukan volume usulan baru yang dioptimalkan berdasarkan tanggapan atau kondisi lapangan yang diinput oleh user.
 
 ATURAN PENTING:
 - Hanya proses item yang memiliki jawabanUser atau tanggapan dari user.
 - Item locked TIDAK perlu masuk rekomendasi (sudah final, tidak berubah).
+- Analisis teks jawabanUser. Tugas krusialmu adalah MEMPREDIKSI atau MENGHITUNG angka volume usulan baru yang lebih efisien secara matematis (misal jika user menyebutkan pengurangan dimensi, penurunan tinggi dinding, atau eliminasi area, kalkulasikan proporsi volume usulan baru secara logis dari volume awal).
 - Berdasarkan tanggapan/jawabanUser yang diberikan, tulis catatan singkat (1-2 kalimat) yang menjelaskan alasan penyesuaian atau justifikasi teknis yang masuk akal agar bisa diajukan ke atasan/klien.
 - Bahasa Indonesia formal, ringkas, dan profesional.
 - Output HARUS berupa JSON array murni, tanpa markdown, tanpa penjelasan tambahan.
 
-Format output:
-[{"itemId": "...", "uraian": "...", "volumeAwal": 0, "catatan": "..."}]`;
+Format output wajib (perhatikan field volumeUsulan harus berupa number hasil analisismu):
+[{"itemId": "...", "uraian": "...", "volumeAwal": 0, "volumeUsulan": 0, "catatan": "..."}]`;
 
 export function buildRecommendPrompt(
   adjustedItems: { itemId: string; uraian: string; volumeAwal: number; volumeBaru: number; jawabanUser?: string }[]
 ): { system: string; user: string } {
   return {
     system: RECOMMEND_SYSTEM_PROMPT,
-    user: `Susun rekomendasi final berdasarkan tanggapan user untuk item-item berikut:\n\n${JSON.stringify(adjustedItems, null, 2)}`,
+    user: `Susun rekomendasi final dan hitung kalkulasi volumeUsulan baru berdasarkan tanggapan user untuk item-item berikut:\n\n${JSON.stringify(adjustedItems, null, 2)}`,
   };
 }
