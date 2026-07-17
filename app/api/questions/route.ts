@@ -14,23 +14,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Daftar item tidak valid.' }, { status: 400 });
     }
 
-    // Batch per 20 item biar prompt ga kepanjangan & response lebih stabil
-    const BATCH_SIZE = 20;
-    const batches: RABItem[][] = [];
-    for (let i = 0; i < items.length; i += BATCH_SIZE) {
-      batches.push(items.slice(i, i + BATCH_SIZE));
-    }
+    const flexibleItems = items.filter((item) => item.status === 'flexible');
 
-    const results = await Promise.all(
-      batches.map(async (batch) => {
-        const { system, user } = buildQuestionsPrompt(batch);
-        return askGeminiForJSON<RABQuestion[]>(system, user);
-      })
-    );
+    const sortedFlexibleItems = flexibleItems.sort((a, b) => {
+      const totalPriceA = (a.volume || 0) * ((a.hargaMaterial || 0) + (a.hargaUpah || 0));
+      const totalPriceB = (b.volume || 0) * ((b.hargaMaterial || 0) + (b.hargaUpah || 0));
+      return totalPriceB - totalPriceA;
+    });
 
-    const questions = results.flat();
+    const topItemsToAnalyze = sortedFlexibleItems.slice(0, 10);
+    const finalItemsToProcess = topItemsToAnalyze.length > 0 ? topItemsToAnalyze : items.slice(0, 10);
 
-    return NextResponse.json({ questions });
+    const { system, user } = buildQuestionsPrompt(finalItemsToProcess);
+    const generatedQuestions = await askGeminiForJSON<RABQuestion[]>(system, user);
+
+    const limitedQuestions = Array.isArray(generatedQuestions) 
+      ? generatedQuestions.slice(0, 5) 
+      : [];
+
+    return NextResponse.json({ questions: limitedQuestions });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat generate pertanyaan.';
     return NextResponse.json({ error: message }, { status: 500 });

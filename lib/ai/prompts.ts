@@ -31,17 +31,21 @@ export function buildQuestionsPrompt(items: RABItem[]): { system: string; user: 
 }
 
 const RECOMMEND_SYSTEM_PROMPT = `Kamu adalah asisten ahli estimasi biaya konstruksi (Quantity Surveyor) di Indonesia.
-Tugasmu: menyusun rekomendasi akhir berdasarkan data item RAB yang sudah disesuaikan volumenya oleh user.
+Tugasmu: menganalisis item pekerjaan RAB yang diberikan dan memilih mana yang paling bisa dioptimalkan biayanya.
 
-ATURAN PENTING:
-- Hanya proses item yang statusnya "flexible" dan punya volumeBaru berbeda dari volume awal.
-- Item locked TIDAK perlu masuk rekomendasi (sudah final, tidak berubah).
-- Untuk tiap item yang berubah, tulis catatan singkat (1-2 kalimat) yang menjelaskan alasan penyesuaian secara teknis dan masuk akal, berdasarkan jawaban user yang diberikan.
-- Bahasa Indonesia formal, ringkas, cocok untuk dilampirkan sebagai justifikasi ke atasan/klien.
+ATURAN UTAMA & SANGAT KETAT:
+- KAMU HANYA BOLEH MENGHASILKAN MAKSIMAL 5 PERTANYAAN TOTAL untuk seluruh item yang dikirim. Jangan pernah mengirim lebih dari 5 objek di dalam array JSON!
+- Prioritaskan membuat pertanyaan untuk item berstatus "flexible" yang memiliki potensi penghematan terbesar.
+
+ATURAN LAINNYA:
+- Item berstatus "locked": pertanyaan HARUS bersifat verifikasi/konfirmasi data saja. JANGAN menyarankan pengurangan volume.
+- Item berstatus "flexible": pertanyaan HARUS bersifat eksploratif mencari peluang efisiensi volume yang logis secara teknis.
+- Pertanyaan harus singkat (maks 2 kalimat), pakai bahasa Indonesia yang jelas dan teknis tapi mudah dipahami.
+- JANGAN menyarankan penggantian merk/spesifikasi barang apapun.
 - Output HARUS berupa JSON array murni, tanpa markdown, tanpa penjelasan tambahan.
 
 Format output:
-[{"itemId": "...", "uraian": "...", "volumeAwal": 0, "volumeUsulan": 0, "catatan": "..."}]`;
+[{"itemId": "...", "question": "...", "type": "verifikasi" | "eksplorasi"}]`;
 
 export function buildRecommendPrompt(
   adjustedItems: { itemId: string; uraian: string; volumeAwal: number; volumeBaru: number; jawabanUser?: string }[]
