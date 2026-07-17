@@ -1,12 +1,18 @@
 import { RABItem } from '../types/rab';
 
-const QUESTIONS_SYSTEM_PROMPT = `Kamu adalah asisten ahli estimasi biaya konstruksi (Quantity Surveyor) di Indonesia.
-Tugasmu: membuat SATU pertanyaan singkat untuk tiap item pekerjaan RAB (Rencana Anggaran Biaya) yang diberikan.
+const QUESTIONS_SYSTEM_PROMPT = `Kamu adalah asisten ahli estimasi biaya konstruksi (Quantity Surveyor) senior di Indonesia yang kritis dan strategis.
+Tugasmu: Menganalisis seluruh item pekerjaan RAB yang diberikan dan menyusun MAKSIMAL 5 PERTANYAAN PALING KRUSIAL untuk menguji peluang efisiensi biaya terbesar.
 
-ATURAN PENTING:
-- Item berstatus "locked": pertanyaan HARUS bersifat verifikasi/konfirmasi data saja (misal cek kesesuaian volume dengan gambar kerja). JANGAN menyarankan pengurangan volume atau perubahan apapun pada item locked.
-- Item berstatus "flexible": pertanyaan HARUS bersifat eksploratif untuk mencari peluang efisiensi volume, dengan tetap logis secara teknis (contoh: menanyakan kedalaman aktual untuk pekerjaan galian, atau apakah ada area yang bisa dikurangi).
-- Pertanyaan harus singkat (maks 2 kalimat), pakai bahasa Indonesia yang jelas dan teknis tapi mudah dipahami.
+Karena jumlah pertanyaan dibatasi MAKSIMAL 5 TOTAL, kamu wajib menggunakan strategi "Efek Domino" dan "Representasi Makro":
+1. Strategi Klasterisasi: Jangan menanyakan item kecil secara individual. Kelompokkan item-item besar yang sejenis (misal: pekerjaan dinding, struktur beton, atau finishing) ke dalam satu pertanyaan induk yang mewakili kelompok tersebut.
+2. Prioritas Anggaran (Pareto 80/20): Fokus hanya pada item/klaster pekerjaan dengan akumulasi volume atau biaya tertinggi yang memiliki status "flexible".
+3. Hubungkan dengan ID Utama: Setiap pertanyaan makro yang kamu hasilkan HARUS dikaitkan dengan salah satu itemId yang menjadi jangkar/perwakilan utama dari klaster pekerjaan tersebut.
+
+ATURAN UTAMA & SANGAT KETAT:
+- KAMU HANYA BOLEH MENGHASILKAN MAKSIMAL 5 PERTANYAAN TOTAL di dalam array JSON. Jangan pernah mengirim lebih dari 5 objek!
+- Item berstatus "locked": Pertanyaan HARUS bersifat verifikasi/konfirmasi data lapangan saja. JANGAN menyarankan pengurangan volume atau perubahan apapun.
+- Item berstatus "flexible": Pertanyaan HARUS bersifat eksploratif menguji kebijakan desain, metode kerja, atau kondisi lapangan yang jika disesuaikan akan otomatis memotong volume di banyak item terkait sekaligus.
+- Pertanyaan harus singkat (maks 2 kalimat), menggunakan bahasa Indonesia yang jelas dan teknis tapi mudah dipahami.
 - JANGAN menyarankan penggantian merk/spesifikasi barang apapun.
 - Output HARUS berupa JSON array murni, tanpa markdown, tanpa penjelasan tambahan.
 
@@ -22,36 +28,34 @@ export function buildQuestionsPrompt(items: RABItem[]): { system: string; user: 
     volume: i.volume,
     status: i.status,
     alasan: i.alasan,
+    hargaMaterial: i.hargaMaterial,
+    hargaUpah: i.hargaUpah,
   }));
 
   return {
     system: QUESTIONS_SYSTEM_PROMPT,
-    user: `Buatkan pertanyaan untuk setiap item berikut:\n\n${JSON.stringify(compactItems, null, 2)}`,
+    user: `Analisis item berikut, kelompokkan secara makro, dan susun maksimal 5 pertanyaan paling berdampak besar:\n\n${JSON.stringify(compactItems, null, 2)}`,
   };
 }
 
 const RECOMMEND_SYSTEM_PROMPT = `Kamu adalah asisten ahli estimasi biaya konstruksi (Quantity Surveyor) di Indonesia.
-Tugasmu: menganalisis item pekerjaan RAB yang diberikan dan memilih mana yang paling bisa dioptimalkan biayanya.
+Tugasmu: menyusun rekomendasi dan catatan justifikasi akhir berdasarkan tanggapan atau kondisi lapangan yang diinput oleh user.
 
-ATURAN UTAMA & SANGAT KETAT:
-- KAMU HANYA BOLEH MENGHASILKAN MAKSIMAL 5 PERTANYAAN TOTAL untuk seluruh item yang dikirim. Jangan pernah mengirim lebih dari 5 objek di dalam array JSON!
-- Prioritaskan membuat pertanyaan untuk item berstatus "flexible" yang memiliki potensi penghematan terbesar.
-
-ATURAN LAINNYA:
-- Item berstatus "locked": pertanyaan HARUS bersifat verifikasi/konfirmasi data saja. JANGAN menyarankan pengurangan volume.
-- Item berstatus "flexible": pertanyaan HARUS bersifat eksploratif mencari peluang efisiensi volume yang logis secara teknis.
-- Pertanyaan harus singkat (maks 2 kalimat), pakai bahasa Indonesia yang jelas dan teknis tapi mudah dipahami.
-- JANGAN menyarankan penggantian merk/spesifikasi barang apapun.
+ATURAN PENTING:
+- Hanya proses item yang memiliki jawabanUser atau tanggapan dari user.
+- Item locked TIDAK perlu masuk rekomendasi (sudah final, tidak berubah).
+- Berdasarkan tanggapan/jawabanUser yang diberikan, tulis catatan singkat (1-2 kalimat) yang menjelaskan alasan penyesuaian atau justifikasi teknis yang masuk akal agar bisa diajukan ke atasan/klien.
+- Bahasa Indonesia formal, ringkas, dan profesional.
 - Output HARUS berupa JSON array murni, tanpa markdown, tanpa penjelasan tambahan.
 
 Format output:
-[{"itemId": "...", "question": "...", "type": "verifikasi" | "eksplorasi"}]`;
+[{"itemId": "...", "uraian": "...", "volumeAwal": 0, "catatan": "..."}]`;
 
 export function buildRecommendPrompt(
   adjustedItems: { itemId: string; uraian: string; volumeAwal: number; volumeBaru: number; jawabanUser?: string }[]
 ): { system: string; user: string } {
   return {
     system: RECOMMEND_SYSTEM_PROMPT,
-    user: `Susun rekomendasi untuk item-item berikut:\n\n${JSON.stringify(adjustedItems, null, 2)}`,
+    user: `Susun rekomendasi final berdasarkan tanggapan user untuk item-item berikut:\n\n${JSON.stringify(adjustedItems, null, 2)}`,
   };
 }

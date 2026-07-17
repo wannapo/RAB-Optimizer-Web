@@ -180,26 +180,18 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
               </div>
               <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2.5 text-xs leading-5 text-sky-900">{q.question}</p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-[180px_1fr] sm:items-end">
-                <label className="text-xs font-bold text-[var(--muted)]">Volume usulan
-                <div className="mt-1 flex items-center"><input
-                  type="number"
-                  value={vBaru}
-                  min="0"
-                  step="any"
-                  onChange={(e) =>
-                    setVolumeBaru((prev) => ({ ...prev, [item.id]: Math.max(0, Number(e.target.value)) }))
-                  }
-                  className="field data-type rounded-r-none px-3 py-2 text-sm"
-                /><span className="rounded-r-lg border border-l-0 border-[#b8c8ce] bg-[#eef3f5] px-3 py-2 text-xs">{item.satuan}</span></div></label>
-                <input
-                  type="text"
-                  aria-label={`Catatan untuk ${item.uraian}`}
-                  placeholder="Alasan atau kondisi lapangan (opsional)"
-                  value={jawaban[item.id] ?? ''}
-                  onChange={(e) => setJawaban((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                  className="field px-3 py-2 text-sm"
-                />
+              <div className="mt-4">
+                <label className="text-xs font-bold text-[var(--muted)] w-full">
+                  Tanggapan & Kondisi Lapangan
+                  <input
+                    type="text"
+                    aria-label={`Catatan untuk ${item.uraian}`}
+                    placeholder="Masukkan alasan, usulan volume baru, atau kondisi lapangan di sini..."
+                    value={jawaban[item.id] ?? ''}
+                    onChange={(e) => setJawaban((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    className="field mt-1 w-full px-3 py-2 text-sm"
+                  />
+                </label>
               </div>
               <div className="mt-3 min-h-5 text-right">
                 {harga > 0 && estimasi !== 0 && (
