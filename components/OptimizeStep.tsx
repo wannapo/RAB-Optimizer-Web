@@ -49,7 +49,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
         });
         setQuestions(map);
 
-        // default volumeBaru = volume awal
         const defaults: Record<string, number> = {};
         parsed.items.forEach((item) => {
           defaults[item.id] = item.volume;
@@ -62,7 +61,6 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
       }
     }
     loadQuestions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalPenghematanBerjalan = parsed.items.reduce((sum, item) => {
@@ -72,13 +70,15 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
     const harga = hargaSatuan(item.hargaMaterial, item.hargaUpah);
     return sum + selisihVolume * harga;
   }, 0);
+
   const flexibleItems = useMemo(() => parsed.items.filter((item) => item.status === 'flexible'), [parsed.items]);
   const changedCount = flexibleItems.filter((item) => (volumeBaru[item.id] ?? item.volume) !== item.volume).length;
   const progress = budgetTarget > 0 ? Math.min(100, Math.max(0, (totalPenghematanBerjalan / budgetTarget) * 100)) : 0;
 
   function handleFinish() {
-    const adjustedItems = parsed.items
-      .filter((item) => item.status === 'flexible')
+    const adjustedItems = Object.values(questions)
+      .map((q) => parsed.items.find((i) => i.id === q.itemId))
+      .filter((item): item is NonNullable<typeof item> => !!item && item.status === 'flexible')
       .map((item) => ({
         itemId: item.id,
         uraian: item.uraian,
@@ -97,8 +97,8 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
         <div>
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-sky-100 border-t-[var(--blueprint-bright)]" />
           <p className="eyebrow mt-6">Membaca konteks pekerjaan</p>
-          <h2 className="display-type mt-3 text-3xl text-[var(--blueprint)]">Menyusun pertanyaan untuk {parsed.items.length} item.</h2>
-          <p className="mt-3 text-sm text-[var(--muted)]">Item diproses per kelompok agar rekomendasinya tetap relevan.</p>
+          <h2 className="display-type mt-3 text-3xl text-[var(--blueprint)]">Menyusun pertanyaan efisiensi.</h2>
+          <p className="mt-3 text-sm text-[var(--muted)]">Menganalisis item prioritas tinggi untuk penghematan maksimal.</p>
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
       <p className="eyebrow">Tahap 03 · Peninjauan volume</p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="display-type text-4xl leading-tight text-[var(--blueprint)] sm:text-5xl">Uji setiap peluang efisiensi.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Ubah hanya volume yang dapat dipertanggungjawabkan. Catatan akan menjadi dasar rekomendasi akhir.</p></div>
-        <span className="data-type whitespace-nowrap text-xs text-[var(--muted)]">{changedCount}/{flexibleItems.length} item diubah</span>
+        <span className="data-type whitespace-nowrap text-xs text-[var(--muted)]">{changedCount}/{Object.keys(questions).length} item terpilih</span>
       </div>
 
       <div className="sticky top-3 z-20 mt-7 rounded-2xl border border-sky-900/10 bg-[var(--blueprint)] p-4 text-white shadow-xl shadow-sky-950/10 sm:p-5">
@@ -129,8 +129,9 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
       </div>
 
       <div className="mt-5 space-y-3 mb-6">
-        {parsed.items.map((item) => {
-          const q = questions[item.id];
+        {Object.values(questions).map((q) => {
+          const item = parsed.items.find((i) => i.id === q.itemId);
+          if (!item) return null;
           const isLocked = item.status === 'locked';
 
           if (isLocked) {
@@ -143,26 +144,24 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
                   </span>
                 </div>
                 <div className="mt-2 text-xs text-amber-800">{item.alasan}</div>
-                {q && (
-                  <div className="mt-3 border-t border-[var(--line)] pt-3">
-                    <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{q.question}</p>
-                    <div className="flex gap-2">
-                      {(['ya', 'tidak'] as const).map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => setVerifikasi((prev) => ({ ...prev, [item.id]: opt }))}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
-                            verifikasi[item.id] === opt
-                              ? 'border-[var(--blueprint)] bg-[var(--blueprint)] text-white'
-                              : 'border-[var(--line)] bg-white text-[var(--muted)]'
-                          }`}
-                        >
-                          {opt === 'ya' ? 'Ya' : 'Tidak'}
-                        </button>
-                      ))}
-                    </div>
+                <div className="mt-3 border-t border-[var(--line)] pt-3">
+                  <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{q.question}</p>
+                  <div className="flex gap-2">
+                    {(['ya', 'tidak'] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setVerifikasi((prev) => ({ ...prev, [item.id]: opt }))}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
+                          verifikasi[item.id] === opt
+                            ? 'border-[var(--blueprint)] bg-[var(--blueprint)] text-white'
+                            : 'border-[var(--line)] bg-white text-[var(--muted)]'
+                        }`}
+                      >
+                        {opt === 'ya' ? 'Ya' : 'Tidak'}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             );
           }
@@ -179,7 +178,7 @@ export default function OptimizeStep({ parsed, budgetTarget, onFinish, onBack }:
                   awal: {item.volume} {item.satuan}
                 </span>
               </div>
-              {q && <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2.5 text-xs leading-5 text-sky-900">{q.question}</p>}
+              <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2.5 text-xs leading-5 text-sky-900">{q.question}</p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-[180px_1fr] sm:items-end">
                 <label className="text-xs font-bold text-[var(--muted)]">Volume usulan
